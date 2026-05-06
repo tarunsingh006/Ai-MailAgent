@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Mail Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span>📧 Mail Agent</span>
+                <button id="newChatBtn" title="New Chat">＋</button>
+            </div>
+            <div class="sidebar-section">
+                <p class="sidebar-label">Last 5 Sent</p>
+                <div id="mailHistory">
+                    <p class="empty-history">No emails sent yet</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main chat area -->
+        <main class="chat-area">
+            <div id="messages" class="messages">
+                <div class="welcome">
+                    <h2>👋 Hi, I'm your Mail Agent</h2>
+                    <p>Tell me who you want to email and what about — I'll draft it for you.</p>
+                </div>
+            </div>
+
+            <div class="input-bar">
+                <textarea id="userInput" placeholder="Type a message..." rows="1"></textarea>
+                <button id="sendBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
