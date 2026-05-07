@@ -1,11 +1,13 @@
 # Personal Mail Agent
 
-**An AI-powered email automation system using Google Gemini and Spring Boot**
+**An AI-powered email automation system using Google Gemini and Python FastAPI**
 
-A microservices application that combines a Python FastAPI agent with a Spring Boot email service. Users send a natural language prompt describing what they want to email about, and the Gemini AI composes a professional email and sends it via Gmail SMTP.
+A microservices application built entirely in Python. Users send a natural language prompt describing what they want to email about, and the Gemini AI composes a professional email and sends it via Gmail SMTP.
 
-**Author**: [bharatmarwah](https://github.com/bharatmarwah)  
-**Version**: 2.0.0
+**Author**: [tarunsingh](https://github.com/tarunsingh006)  
+**Version**: 3.0.0
+
+> **v3.0.0** — Migrated the mail service from Java Spring Boot to Python FastAPI for a 100% Python stack.
 
 ---
 
@@ -21,8 +23,8 @@ A microservices application that combines a Python FastAPI agent with a Spring B
                      │ HTTP POST (JSON)
                      ▼
 ┌──────────────────────────────────────────────────────────────┐
-│              Spring Boot Email Service                       │
-│             (Java 21 / Spring Boot 3.5.11)                  │
+│              FastAPI Mail Service                            │
+│                 (Python 3.10+ / smtplib)                    │
 │         • SMTP Gateway  • Email Delivery                     │
 │                    Port 8080                                 │
 └────────────────────┬─────────────────────────────────────────┘
@@ -35,18 +37,16 @@ A microservices application that combines a Python FastAPI agent with a Spring B
 
 - **🤖 AI Email Writing** — Gemini 2.5-Flash composes professional emails from a simple prompt
 - **📏 Word Count Control** — Specify a minimum word count; the agent regenerates if too short
-- **📧 Gmail SMTP Delivery** — Emails sent via Spring Boot mail service through Gmail
+- **📧 Gmail SMTP Delivery** — Emails sent via Python smtplib through Gmail
 - **⚡ Async Architecture** — Non-blocking HTTP calls between services using `httpx`
-- **🐳 Docker Compose** — One-command deployment with health checks and networking
-- **📚 Swagger Docs** — Interactive API docs at `/docs` (FastAPI) and `/swagger-ui.html` (Spring Boot)
+- **🐍 100% Python** — Both services built with FastAPI, no Java required
+- **📚 Swagger Docs** — Interactive API docs at `/docs` for both services
 
 ## 📋 Prerequisites
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| **Python** | 3.10+ | FastAPI agent runtime |
-| **Java** | 21+ | Spring Boot service runtime |
-| **Maven** | 3.8+ | Java build tool |
+| **Python** | 3.10+ | Runtime for both services |
 | **Docker** | 20.10+ | Container deployment (optional) |
 | **Gmail Account** | — | SMTP email delivery |
 | **Gemini API Key** | — | Google AI for email composition |
@@ -60,46 +60,38 @@ A microservices application that combines a Python FastAPI agent with a Spring B
 
 ### 2. Configure Environment
 
-```bash
-cp .env.example .env
-# Edit .env:
-#   GOOGLE_API_KEY=your_gemini_api_key
-#   MAIL_USERNAME=your_email@gmail.com
-#   MAIL_PASSWORD=your_app_specific_password
+**EmailAgent/.env:**
+```
+GOOGLE_API_KEY=your_gemini_api_key
+MAIL_SERVICE_URL=http://localhost:8080
+```
+
+**mail-service-python/.env:**
+```
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_specific_password
 ```
 
 ### 3. Start Services
 
-#### Option A: Local Development
-
-**Terminal 1 — Java Email Service:**
+**Terminal 1 — Python Mail Service:**
 ```bash
-cd mail-tool-service
-mvn clean install
-mvn spring-boot:run
+cd mail-service-python
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8080
 # Running on http://localhost:8080
 ```
 
-**Terminal 2 — Python Agent:**
+**Terminal 2 — Python AI Agent:**
 ```bash
 cd EmailAgent
-
-# Create & activate virtual environment
-python -m venv agentenv
-agentenv\Scripts\activate        # Windows
-# source agentenv/bin/activate   # Linux/Mac
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux/Mac
 
 pip install -r requirements.txt
 uvicorn main:app --reload
 # Running on http://localhost:8000
-```
-
-#### Option B: Docker Compose
-
-```bash
-docker-compose up -d
-docker-compose ps
-docker-compose logs -f
 ```
 
 ## 📁 Project Structure
@@ -111,28 +103,17 @@ PersonalMailAgent/
 ├── .env.example
 ├── .gitignore
 │
-├── EmailAgent/                          # Python FastAPI Agent
-│   ├── main.py                         # App entry point & AI logic
-│   ├── requirements.txt                # Python dependencies
-│   ├── .env                            # Local env vars (not committed)
-│   └── agentenv/                       # Virtual environment
+├── EmailAgent/                          # Python FastAPI AI Agent
+│   ├── main.py                         # AI logic & entry point
+│   ├── requirements.txt
+│   └── .env                            # GOOGLE_API_KEY (not committed)
 │
-└── mail-tool-service/                   # Spring Boot Email Service
-    ├── pom.xml                         # Maven config
-    ├── Dockerfile
-    └── src/main/
-        ├── java/com/bharatmarwah/mail_tool_service/
-        │   ├── MailToolServiceApplication.java
-        │   ├── Controller/
-        │   │   └── EmailController.java
-        │   ├── Service/
-        │   │   └── EmailService.java
-        │   └── Model/
-        │       └── EmailSendRequest.java
-        └── resources/
-            ├── application.properties
-            ├── application-dev.properties
-            └── application-prod.properties
+├── mail-service-python/                 # Python FastAPI Mail Service
+│   ├── main.py                         # SMTP gateway
+│   ├── requirements.txt
+│   └── .env                            # MAIL_USERNAME, MAIL_PASSWORD (not committed)
+│
+└── mail-tool-service/                   # Legacy Java Spring Boot (replaced in v3.0.0)
 ```
 
 ## 🔌 API Reference
@@ -169,7 +150,7 @@ curl -X POST http://localhost:8000/chat \
 }
 ```
 
-### POST `/api/email` — Direct Email (Java Service)
+### POST `/api/email` — Direct Email (Mail Service)
 
 Send an email directly without AI composition.
 
@@ -187,22 +168,21 @@ curl -X POST http://localhost:8080/api/email \
 
 | Service | URL |
 |---------|-----|
-| FastAPI Swagger | http://localhost:8000/docs |
-| FastAPI ReDoc | http://localhost:8000/redoc |
-| Spring Boot Swagger | http://localhost:8080/swagger-ui.html |
+| AI Agent Swagger | http://localhost:8000/docs |
+| Mail Service Swagger | http://localhost:8080/docs |
 
 ## ⚙️ Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `GOOGLE_API_KEY` | ✅ | — | Gemini API key |
-| `MAIL_USERNAME` | ✅ | — | Gmail address (Java service) |
-| `MAIL_PASSWORD` | ✅ | — | Gmail app-specific password |
-| `MAIL_SERVICE_URL` | ❌ | `http://localhost:8080` | Java service URL |
+| Variable | Service | Required | Description |
+|----------|---------|----------|-------------|
+| `GOOGLE_API_KEY` | EmailAgent | ✅ | Gemini API key |
+| `MAIL_USERNAME` | mail-service-python | ✅ | Gmail address |
+| `MAIL_PASSWORD` | mail-service-python | ✅ | Gmail app-specific password |
+| `MAIL_SERVICE_URL` | EmailAgent | ❌ | Mail service URL (default: `http://localhost:8080`) |
 
 ## 🧰 Tech Stack
 
-### Python Agent
+### AI Agent (EmailAgent)
 | Package | Version | Purpose |
 |---------|---------|---------|
 | FastAPI | 0.135.1 | Web framework |
@@ -211,35 +191,26 @@ curl -X POST http://localhost:8080/api/email \
 | LangChain Google GenAI | 4.2.1 | Gemini integration |
 | Pydantic | 2.12.5 | Request validation |
 | httpx | 0.28.1 | Async HTTP client |
+| python-dotenv | 1.2.2 | Environment variables |
 
-### Java Email Service
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| Spring Boot | 3.5.11 | Web framework |
-| Java | 21 | Runtime |
-| Spring Mail | — | SMTP email sending |
-| SpringDoc OpenAPI | 2.8.15 | Swagger UI |
-| Lombok | — | Boilerplate reduction |
+### Mail Service (mail-service-python)
+| Package | Version | Purpose |
+|---------|---------|---------|
+| FastAPI | 0.115.0 | Web framework |
+| Uvicorn | 0.30.0 | ASGI server |
+| smtplib | built-in | Gmail SMTP sending |
+| python-dotenv | 1.0.1 | Environment variables |
 
 ## 🔍 Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| `Could not import module "main"` | Run `uvicorn` from inside the `EmailAgent/` directory |
+| `GOOGLE_API_KEY` missing | Create `.env` in `EmailAgent/` with your Gemini API key |
 | SMTP authentication failed | Use a Gmail [App Password](https://myaccount.google.com/apppasswords), not your regular password |
-| Connection refused to mail service | Make sure the Java service is running on port 8080 first |
+| Connection refused to mail service | Start `mail-service-python` on port 8080 first |
 | Module not found errors | Activate the virtual environment and run `pip install -r requirements.txt` |
-| Port already in use | Stop the conflicting process or change the port |
-
-## 🐳 Docker Services
-
-The `docker-compose.yml` defines:
-- **mail-tool-service** — Spring Boot on port 8080 with health checks
-- **email-agent** — FastAPI on port 8000, depends on mail service health
-- **mail-agent-network** — Bridge network for inter-service communication
-
-Both services include automatic restart, JSON logging, and health monitoring.
+| `(.venv)` not showing | Run `.venv\Scripts\activate` before installing packages |
 
 ---
 
-**Made with ❤️ by bharatmarwah**
+**Made with ❤️ by tarunsingh**
