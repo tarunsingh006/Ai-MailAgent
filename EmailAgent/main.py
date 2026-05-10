@@ -32,12 +32,23 @@ llm = ChatGoogleGenerativeAI(
 )
 
 logger.info("Gemini initialized")
-
 # In-memory session store: session_id -> list of messages
 sessions: Dict[str, list] = {}
 
 # Last 5 sent emails
-sent_emails: deque = deque(maxlen=5)
+SENT_EMAILS_FILE = "sent_emails.json"
+
+def load_sent_emails() -> deque:
+    if os.path.exists(SENT_EMAILS_FILE):
+        with open(SENT_EMAILS_FILE) as f:
+            return deque(json.load(f), maxlen=5)
+    return deque(maxlen=5)
+
+def save_sent_emails():
+    with open(SENT_EMAILS_FILE, "w") as f:
+        json.dump(list(sent_emails), f)
+
+sent_emails: deque = load_sent_emails()
 
 SYSTEM_PROMPT = """You are a friendly personal email assistant. Your job is to help the user draft and send emails through natural conversation.
 
@@ -79,7 +90,7 @@ def extract_text(resp):
 
 
 async def call_email_service(to: str, subject: str, body: str):
-    mail_service_url = os.getenv("MAIL_SERVICE_URL", "http://localhost:8001")
+    mail_service_url = os.getenv("MAIL_SERVICE_URL", "http://localhost:8080")
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             response = await client.post(
@@ -102,7 +113,13 @@ async def chat(msg: ChatMessage):
     history = sessions[session_id]
 
     # Build messages for LLM
-    messages = [SystemMessage(content=SYSTEM_PROMPT)]
+    history_context = ""
+    if sent_emails:
+        history_context = "\n\nPreviously sent emails (use for context/style):\n"
+        for i, m in enumerate(sent_emails, 1):
+            history_context += f"{i}. To: {m['to']} | Subject: {m['subject']} | Preview: {m['preview']}\n"
+
+    messages = [SystemMessage(content=SYSTEM_PROMPT + history_context)]
     for m in history:
         if m["role"] == "user":
             messages.append(HumanMessage(content=m["content"]))
@@ -135,6 +152,7 @@ async def chat(msg: ChatMessage):
                     "subject": email_data["subject"],
                     "preview": email_data["body"][:120] + "..."
                 })
+                save_sent_emails()
                 # Clean reply for display
                 clean_reply = reply_text.replace(f"SEND_EMAIL:{json_str}", "").strip()
                 if not clean_reply:

@@ -149,3 +149,6 @@ email_archive/
 attachments/
 *.eml
 
+# Personal data
+sent_emails.json
+

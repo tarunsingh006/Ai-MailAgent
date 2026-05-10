@@ -1,4 +1,4 @@
-const API = "http://localhost:8001";
+const API = "http://localhost:8000";
 let sessionId = crypto.randomUUID();
 
 const messagesEl = document.getElementById("messages");
