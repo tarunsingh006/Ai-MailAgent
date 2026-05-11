@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import os
 from dotenv import load_dotenv
@@ -12,7 +13,15 @@ import json
 from typing import Optional, Dict, Any
 from collections import deque
 
-logging.basicConfig(level=logging.INFO)
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/agent.log"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Personal Mail Agent", version="3.0.0")
@@ -24,14 +33,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-llm = ChatGoogleGenerativeAI(
+llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.8,
     max_output_tokens=2048,
     google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
-logger.info("Gemini initialized")
+llm_ollama = ChatOllama(
+    model="llama3.1:8b",
+    temperature=0.8,
+)
+
+logger.info("Gemini and Ollama initialized")
+
+
+def generate_with_fallback(messages):
+    try:
+        response = llm_gemini.invoke(messages)
+        logger.info("Used Gemini")
+        return response
+    except Exception as e:
+        if "quota" in str(e).lower() or "429" in str(e) or "rate" in str(e).lower():
+            logger.warning(f"Gemini quota hit, falling back to Ollama: {e}")
+            response = llm_ollama.invoke(messages)
+            logger.info("Used Ollama fallback")
+            return response
+        raise
 # In-memory session store: session_id -> list of messages
 sessions: Dict[str, list] = {}
 
@@ -53,15 +81,16 @@ sent_emails: deque = load_sent_emails()
 SYSTEM_PROMPT = """You are a friendly personal email assistant. Your job is to help the user draft and send emails through natural conversation.
 
 Your behavior:
-- Greet the user warmly on first message
+- On the very first message, greet the user and ask for their name
+- Use their name naturally in the conversation
 - Gather information naturally through conversation: recipient email, what the email is about, and preferred length (optional, default 150 words)
 - Once you have enough info, draft a professional email and present it clearly
 - After showing the draft, ask if they want to send it, modify it, or start over
 - If user wants changes, redraft accordingly
 - When user confirms to send, respond with a JSON block ONLY in this exact format (nothing else on that line):
   SEND_EMAIL:{"to":"email","subject":"subject","body":"full email body"}
+- Sign emails with the user's name they provided
 - Keep responses concise and conversational
-- The sender's name is Bharat, emails should be signed "Warm regards, Bharat"
 """
 
 
@@ -127,8 +156,10 @@ async def chat(msg: ChatMessage):
             messages.append(AIMessage(content=m["content"]))
     messages.append(HumanMessage(content=msg.message))
 
-    response = llm.invoke(messages)
+    logger.info(f"[CHAT] session={session_id} | message={msg.message[:60]}")
+    response = generate_with_fallback(messages)
     reply_text = extract_text(response)
+    logger.info(f"[LLM] reply preview: {reply_text[:80]}")
 
     # Save to history
     history.append({"role": "user", "content": msg.message})
@@ -147,6 +178,7 @@ async def chat(msg: ChatMessage):
             )
 
             if result["success"]:
+                logger.info(f"[EMAIL SENT] to={email_data['to']} | subject={email_data['subject']}")
                 sent_emails.appendleft({
                     "to": email_data["to"],
                     "subject": email_data["subject"],
@@ -161,9 +193,10 @@ async def chat(msg: ChatMessage):
                 history[-1]["content"] = clean_reply
                 return ChatReply(reply=clean_reply, action="sent", sent_email=email_data)
             else:
+                logger.error(f"[EMAIL FAILED] {result.get('error')}")
                 return ChatReply(reply=f"❌ Failed to send: {result.get('error')}")
         except Exception as e:
-            logger.error(f"Send parse error: {e}")
+            logger.error(f"[PARSE ERROR] {e}")
 
     return ChatReply(reply=reply_text)
 
