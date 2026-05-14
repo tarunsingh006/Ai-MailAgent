@@ -1,13 +1,13 @@
-# Personal Mail Agent
+# AI Mail Agent
 
-**An AI-powered email automation system using Google Gemini and Python FastAPI**
+**An AI-powered email automation system using Google Gemini, FastAPI, and Gmail SMTP**
 
-A microservices application built entirely in Python. Users send a natural language prompt describing what they want to email about, and the Gemini AI composes a professional email and sends it via Gmail SMTP.
+A small Python microservices app where users describe what they want to email, the agent drafts a professional message, and the mail service delivers it through Gmail SMTP.
 
-**Author**: [tarunsingh](https://github.com/tarunsingh006)  
+**Authors**: Tarun and Bharat  
 **Version**: 3.0.0
 
-> **v3.0.0** — Migrated the mail service from Java Spring Boot to Python FastAPI for a 100% Python stack.
+> **v3.0.0** — Python-only stack with a FastAPI agent service, FastAPI mail service, and a static frontend.
 
 ---
 
@@ -15,17 +15,21 @@ A microservices application built entirely in Python. Users send a natural langu
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                   FastAPI Agent Service                      │
-│              (Python 3.10+ / Gemini 2.5-Flash)              │
-│         • AI Email Composition  • Word Count Control         │
-│                    Port 8000                                 │
+│                         Frontend                             │
+│                   Static UI on Port 3000                     │
 └────────────────────┬─────────────────────────────────────────┘
-                     │ HTTP POST (JSON)
+                     │ HTTP POST /chat
                      ▼
 ┌──────────────────────────────────────────────────────────────┐
-│              FastAPI Mail Service                            │
-│                 (Python 3.10+ / smtplib)                    │
-│         • SMTP Gateway  • Email Delivery                     │
+│                     Email Agent                              │
+│        FastAPI + Gemini + conversation/session state         │
+│                    Port 8000                                 │
+└────────────────────┬─────────────────────────────────────────┘
+                     │ HTTP POST /api/email
+                     ▼
+┌──────────────────────────────────────────────────────────────┐
+│                     Mail Service                             │
+│             FastAPI + smtplib + Gmail SMTP                  │
 │                    Port 8080                                 │
 └────────────────────┬─────────────────────────────────────────┘
                      │
@@ -35,90 +39,113 @@ A microservices application built entirely in Python. Users send a natural langu
 
 ## ✨ Features
 
-- **🤖 AI Email Writing** — Gemini 2.5-Flash composes professional emails from a simple prompt
-- **📏 Word Count Control** — Specify a minimum word count; the agent regenerates if too short
-- **📧 Gmail SMTP Delivery** — Emails sent via Python smtplib through Gmail
-- **⚡ Async Architecture** — Non-blocking HTTP calls between services using `httpx`
-- **🐍 100% Python** — Both services built with FastAPI, no Java required
-- **📚 Swagger Docs** — Interactive API docs at `/docs` for both services
+- **🤖 AI email drafting** — Gemini generates polished email copy from natural language prompts
+- **📬 Direct SMTP delivery** — The mail service sends messages through Gmail using `smtplib`
+- **💬 Conversational flow** — The agent can ask follow-up questions before drafting
+- **🔁 Fallback support** — If Gemini is rate-limited, the agent can fall back to Ollama
+- **📚 Interactive docs** — FastAPI Swagger docs available for both backend services
+- **🐳 Docker Compose ready** — One command can start the frontend and both APIs
 
 ## 📋 Prerequisites
 
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| **Python** | 3.10+ | Runtime for both services |
-| **Docker** | 20.10+ | Container deployment (optional) |
-| **Gmail Account** | — | SMTP email delivery |
-| **Gemini API Key** | — | Google AI for email composition |
+| Component | Recommended | Purpose |
+|-----------|-------------|---------|
+| **Python** | 3.10+ | Local development and container runtime |
+| **Docker + Compose** | Latest stable | Easiest way to run the full stack |
+| **Gmail account** | With 2FA enabled | SMTP delivery |
+| **Gmail App Password** | Required | Auth for SMTP login |
+| **Gemini API key** | Required | Email drafting model access |
 
-## 🛠️ Setup
+## 🚀 Quick start with Docker Compose
 
-### 1. Get Credentials
+1. Copy `.env.example` to `.env` in the project root and fill in your credentials.
+2. Start the full stack:
 
-- **Gmail App Password**: Enable 2FA → [Generate App Password](https://myaccount.google.com/apppasswords)
-- **Gemini API Key**: [Google AI Studio](https://aistudio.google.com/apikey)
-
-### 2. Configure Environment
-
-**EmailAgent/.env:**
+```bash
+docker compose up
 ```
+
+3. Open the apps:
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Email Agent Swagger | http://localhost:8000/docs |
+| Mail Service Swagger | http://localhost:8080/docs |
+
+> The compose file uses the Python base image for each service, installs the service requirements on startup, and mounts the local source code for easy iteration.
+
+## 🛠️ Manual local setup
+
+### 1. Get credentials
+
+- **Gmail App Password**: enable 2FA, then create an app password in your Google account
+- **Gemini API Key**: generate one from [Google AI Studio](https://aistudio.google.com/apikey)
+
+### 2. Configure environment
+
+Root `.env` variables used by Docker Compose:
+
+```dotenv
 GOOGLE_API_KEY=your_gemini_api_key
-MAIL_SERVICE_URL=http://localhost:8080
-```
-
-**mail-service-python/.env:**
-```
 MAIL_USERNAME=your_email@gmail.com
 MAIL_PASSWORD=your_app_specific_password
+MAIL_SERVICE_URL=http://localhost:8080
+APP_ENV=development
+LOG_LEVEL=INFO
 ```
 
-### 3. Start Services
+### 3. Run services separately
 
-**Terminal 1 — Python Mail Service:**
+**Mail service**
+
 ```bash
 cd mail-service-python
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8080
-# Running on http://localhost:8080
+uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-**Terminal 2 — Python AI Agent:**
+**Email agent**
+
 ```bash
 cd EmailAgent
 python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/Mac
-
+.venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
-# Running on http://localhost:8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## 📁 Project Structure
+**Frontend**
 
+```bash
+cd frontend
+python server.py
 ```
-PersonalMailAgent/
+
+## 📁 Project structure
+
+```text
+Ai-MailAgent/
 ├── README.md
 ├── docker-compose.yml
 ├── .env.example
-├── .gitignore
-│
-├── EmailAgent/                          # Python FastAPI AI Agent
-│   ├── main.py                         # AI logic & entry point
+├── EmailAgent/
+│   ├── main.py
 │   ├── requirements.txt
-│   └── .env                            # GOOGLE_API_KEY (not committed)
-│
-├── mail-service-python/                 # Python FastAPI Mail Service
-│   ├── main.py                         # SMTP gateway
-│   ├── requirements.txt
-│   └── .env                            # MAIL_USERNAME, MAIL_PASSWORD (not committed)
-│
-└── mail-tool-service/                   # Legacy Java Spring Boot (replaced in v3.0.0)
+│   └── .env.example
+├── mail-service-python/
+│   ├── main.py
+│   └── requirements.txt
+└── frontend/
+    ├── index.html
+    ├── script.js
+    ├── style.css
+    └── server.py
 ```
 
-## 🔌 API Reference
+## 🔌 API reference
 
-### POST `/chat` — Compose & Send Email
+### POST `/chat` — Compose and send email
 
 Send a prompt and the agent writes a professional email and delivers it.
 
@@ -150,7 +177,7 @@ curl -X POST http://localhost:8000/chat \
 }
 ```
 
-### POST `/api/email` — Direct Email (Mail Service)
+### POST `/api/email` — Direct email delivery
 
 Send an email directly without AI composition.
 
@@ -164,7 +191,7 @@ curl -X POST http://localhost:8080/api/email \
   }'
 ```
 
-### Interactive Documentation
+### Interactive documentation
 
 | Service | URL |
 |---------|-----|
@@ -175,42 +202,43 @@ curl -X POST http://localhost:8080/api/email \
 
 | Variable | Service | Required | Description |
 |----------|---------|----------|-------------|
-| `GOOGLE_API_KEY` | EmailAgent | ✅ | Gemini API key |
-| `MAIL_USERNAME` | mail-service-python | ✅ | Gmail address |
+| `GOOGLE_API_KEY` | EmailAgent | ✅ | Gemini API key used by the agent |
+| `MAIL_USERNAME` | mail-service-python | ✅ | Gmail address used for SMTP login |
 | `MAIL_PASSWORD` | mail-service-python | ✅ | Gmail app-specific password |
-| `MAIL_SERVICE_URL` | EmailAgent | ❌ | Mail service URL (default: `http://localhost:8080`) |
+| `MAIL_SERVICE_URL` | EmailAgent | ❌ | Mail service URL; Docker Compose sets this to `http://mail-service:8080` |
+| `APP_ENV` | Both backend services | ❌ | App mode, defaults to `development` |
+| `LOG_LEVEL` | Both backend services | ❌ | Logging verbosity, defaults to `INFO` |
 
-## 🧰 Tech Stack
+## 🧰 Tech stack
 
-### AI Agent (EmailAgent)
-| Package | Version | Purpose |
-|---------|---------|---------|
-| FastAPI | 0.135.1 | Web framework |
-| Uvicorn | 0.41.0 | ASGI server |
-| LangChain Core | 1.2.16 | LLM abstraction |
-| LangChain Google GenAI | 4.2.1 | Gemini integration |
-| Pydantic | 2.12.5 | Request validation |
-| httpx | 0.28.1 | Async HTTP client |
-| python-dotenv | 1.2.2 | Environment variables |
+### EmailAgent
 
-### Mail Service (mail-service-python)
-| Package | Version | Purpose |
-|---------|---------|---------|
-| FastAPI | 0.115.0 | Web framework |
-| Uvicorn | 0.30.0 | ASGI server |
-| smtplib | built-in | Gmail SMTP sending |
-| python-dotenv | 1.0.1 | Environment variables |
+- FastAPI 0.135.1
+- Uvicorn 0.41.0
+- LangChain Core 0.3.86
+- LangChain Google GenAI 4.2.1
+- LangChain Ollama 0.3.3
+- Pydantic 2.12.5
+- httpx 0.28.1
+- python-dotenv 1.2.2
+
+### Mail service
+
+- FastAPI 0.115.0
+- Uvicorn 0.30.0
+- python-dotenv 1.0.1
+- Built-in `smtplib` for Gmail delivery
 
 ## 🔍 Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| `GOOGLE_API_KEY` missing | Create `.env` in `EmailAgent/` with your Gemini API key |
-| SMTP authentication failed | Use a Gmail [App Password](https://myaccount.google.com/apppasswords), not your regular password |
-| Connection refused to mail service | Start `mail-service-python` on port 8080 first |
-| Module not found errors | Activate the virtual environment and run `pip install -r requirements.txt` |
-| `(.venv)` not showing | Run `.venv\Scripts\activate` before installing packages |
+| `GOOGLE_API_KEY` missing | Create a root `.env` file or export the variable before starting the services |
+| SMTP authentication failed | Use a Gmail [App Password](https://myaccount.google.com/apppasswords), not your normal password |
+| Connection refused to mail service | Make sure `mail-service-python` is running on port 8080 first |
+| Frontend cannot reach the agent | Confirm the agent is running on `http://localhost:8000` and that CORS is enabled |
+| Module not found errors | Reinstall the requirements inside the correct virtual environment |
 
 ---
 
-**Made with ❤️ by tarunsingh**
+**Made with ❤️ by Tarun and Bharat**
